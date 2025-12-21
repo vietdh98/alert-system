@@ -1,0 +1,18 @@
+alert-system/
+├── docker-compose.yml          # Docker Compose chung
+├── .env                        # Biến môi trường
+├── frontend/
+│   ├── Dockerfile              # Docker cho frontend
+│   ├── nginx.conf              # Cấu hình Nginx
+│   └── dist/                   # Build frontend
+│       ├── index.html
+│       ├── css/
+│       └── js/
+└── backend/
+    ├── Dockerfile              # Docker cho backend
+    ├── requirements.txt        # Python dependencies
+    ├── app.py                  # Main backend app
+    ├── config.py              # Config
+    ├── models.py              # Database models
+    └── database/
+        └── schema.sql         # PostgreSQL schema
