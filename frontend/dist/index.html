@@ -6,6 +6,7 @@
     <title>Hệ thống Cảnh báo Prometheus</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* Các style giữ nguyên như trước */
         :root {
             --primary-color: #2c3e50;
             --secondary-color: #3498db;
@@ -214,6 +215,16 @@
             background: #2980b9;
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+            transform: translateY(-2px);
         }
 
         .alert-table-container {
@@ -470,6 +481,68 @@
             animation: spin 1.5s linear infinite;
         }
 
+        /* Thêm style cho custom time range */
+        .custom-time-range {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .time-range-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .time-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .time-input-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        .time-input-group input {
+            padding: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 180px;
+        }
+
+        .time-input-group input:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+        }
+
+        .custom-time-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .time-info {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-small {
+            padding: 8px 15px;
+            font-size: 13px;
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -492,6 +565,20 @@
             
             .search-box {
                 max-width: 100%;
+            }
+            
+            .time-range-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .time-input-group {
+                width: 100%;
+            }
+            
+            .custom-time-buttons {
+                width: 100%;
+                justify-content: space-between;
             }
             
             th, td {
@@ -576,13 +663,56 @@
                 </select>
                 <select id="time-filter">
                     <option value="all">Tất cả thời gian</option>
+                    <option value="15m">15 phút qua</option>
+                    <option value="30m">30 phút qua</option>
                     <option value="1h">1 giờ qua</option>
+                    <option value="3h">3 giờ qua</option>
+                    <option value="6h">6 giờ qua</option>
+                    <option value="12h">12 giờ qua</option>
                     <option value="24h">24 giờ qua</option>
+                    <option value="2d">2 ngày qua</option>
+                    <option value="7d">7 ngày qua</option>
+                    <option value="30d">30 ngày qua</option>
+                    <option value="custom">Tuỳ chỉnh khung giờ</option>
                 </select>
             </div>
             <button class="btn btn-primary" id="refresh-btn">
                 <i class="fas fa-sync-alt"></i> Làm mới
             </button>
+        </div>
+
+        <!-- Custom Time Range -->
+        <div class="custom-time-range" id="custom-time-range">
+            <div class="time-range-controls">
+                <div class="time-input-group">
+                    <label><i class="far fa-clock"></i> Thời gian bắt đầu</label>
+                    <input type="datetime-local" id="custom-start-time">
+                    <div class="time-info">
+                        <i class="fas fa-info-circle"></i>
+                        Định dạng: YYYY-MM-DD HH:MM
+                    </div>
+                </div>
+                <div class="time-input-group">
+                    <label><i class="far fa-clock"></i> Thời gian kết thúc</label>
+                    <input type="datetime-local" id="custom-end-time">
+                    <div class="time-info">
+                        <i class="fas fa-info-circle"></i>
+                        Để trống = thời gian hiện tại
+                    </div>
+                </div>
+                <div class="custom-time-buttons">
+                    <button class="btn btn-primary btn-small" id="apply-custom-time">
+                        <i class="fas fa-check"></i> Áp dụng
+                    </button>
+                    <button class="btn btn-secondary btn-small" id="reset-custom-time">
+                        <i class="fas fa-times"></i> Đặt lại
+                    </button>
+                </div>
+            </div>
+            <div class="time-info" style="margin-top: 10px;">
+                <i class="fas fa-history"></i>
+                <span id="custom-time-info">Chưa thiết lập khung thời gian tuỳ chỉnh</span>
+            </div>
         </div>
 
         <!-- Alert Table -->
@@ -633,6 +763,11 @@
         const itemsPerPage = 10;
         let autoRefreshInterval;
         let countdown = 5;
+        let customTimeRange = {
+            start: null,
+            end: null,
+            active: false
+        };
 
         // Hàm định dạng thời gian
         function formatTime(timeString) {
@@ -645,6 +780,16 @@
                 minute: '2-digit',
                 second: '2-digit'
             });
+        }
+
+        // Định dạng thời gian cho input datetime-local
+        function formatDateTimeLocal(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
         }
 
         // Tính thời gian đã trôi qua
@@ -667,6 +812,11 @@
             const now = new Date();
             const timeStr = now.toLocaleTimeString('vi-VN');
             document.getElementById('update-time').textContent = timeStr;
+            
+            // Cập nhật giá trị mặc định cho input thời gian kết thúc
+            if (!document.getElementById('custom-end-time').value) {
+                document.getElementById('custom-end-time').value = formatDateTimeLocal(now);
+            }
         }
 
         // Cập nhật thống kê
@@ -700,6 +850,19 @@
                 case 'info': return 'fas fa-info-circle';
                 case 'normal': return 'fas fa-check-circle';
                 default: return 'fas fa-bell';
+            }
+        }
+
+        // Chuyển đổi chuỗi thời gian thành mili giây
+        function parseTimeString(timeStr) {
+            const unit = timeStr.slice(-1);
+            const value = parseInt(timeStr.slice(0, -1));
+            
+            switch(unit) {
+                case 'm': return value * 60 * 1000; // phút
+                case 'h': return value * 60 * 60 * 1000; // giờ
+                case 'd': return value * 24 * 60 * 60 * 1000; // ngày
+                default: return 0;
             }
         }
 
@@ -879,6 +1042,50 @@
             }
         }
 
+        // Áp dụng khung thời gian tuỳ chỉnh
+        function applyCustomTimeRange() {
+            const startInput = document.getElementById('custom-start-time').value;
+            const endInput = document.getElementById('custom-end-time').value;
+            
+            if (!startInput) {
+                alert('Vui lòng nhập thời gian bắt đầu!');
+                return;
+            }
+            
+            customTimeRange.start = new Date(startInput);
+            customTimeRange.end = endInput ? new Date(endInput) : new Date();
+            customTimeRange.active = true;
+            
+            // Cập nhật thông tin hiển thị
+            const startStr = customTimeRange.start.toLocaleString('vi-VN');
+            const endStr = customTimeRange.end.toLocaleString('vi-VN');
+            document.getElementById('custom-time-info').innerHTML = 
+                `<strong>Đang lọc:</strong> ${startStr} → ${endStr}`;
+            
+            // Áp dụng bộ lọc
+            filterAlerts();
+        }
+
+        // Đặt lại khung thời gian tuỳ chỉnh
+        function resetCustomTimeRange() {
+            customTimeRange = {
+                start: null,
+                end: null,
+                active: false
+            };
+            
+            document.getElementById('custom-start-time').value = '';
+            document.getElementById('custom-end-time').value = formatDateTimeLocal(new Date());
+            document.getElementById('custom-time-info').textContent = 'Chưa thiết lập khung thời gian tuỳ chỉnh';
+            
+            // Cập nhật dropdown về "Tất cả thời gian"
+            document.getElementById('time-filter').value = 'all';
+            document.getElementById('custom-time-range').style.display = 'none';
+            
+            // Áp dụng bộ lọc
+            filterAlerts();
+        }
+
         // Lọc cảnh báo
         function filterAlerts() {
             const searchText = document.getElementById('search-input').value.toLowerCase();
@@ -899,22 +1106,24 @@
                 }
                 
                 // Lọc theo thời gian
-                if (timeFilter !== 'all') {
+                if (timeFilter !== 'all' || customTimeRange.active) {
                     const alertTime = new Date(alert.startTime);
-                    const now = new Date();
-                    let timeLimit = new Date();
                     
-                    switch(timeFilter) {
-                        case '1h':
-                            timeLimit.setHours(now.getHours() - 1);
-                            break;
-                        case '24h':
-                            timeLimit.setHours(now.getHours() - 24);
-                            break;
-                    }
-                    
-                    if (alertTime < timeLimit) {
-                        return false;
+                    if (customTimeRange.active) {
+                        // Lọc theo khung thời gian tuỳ chỉnh
+                        if (alertTime < customTimeRange.start || alertTime > customTimeRange.end) {
+                            return false;
+                        }
+                    } else if (timeFilter !== 'all' && timeFilter !== 'custom') {
+                        // Lọc theo các khoảng thời gian định sẵn
+                        const now = new Date();
+                        
+                        if (timeFilter.match(/^\d+[mhd]$/)) {
+                            const timeLimit = new Date(now.getTime() - parseTimeString(timeFilter));
+                            if (alertTime < timeLimit) {
+                                return false;
+                            }
+                        }
                     }
                 }
                 
@@ -961,6 +1170,13 @@
             // Ẩn bảng ban đầu
             document.getElementById('alerts-table').style.display = 'none';
             
+            // Thiết lập giá trị mặc định cho input thời gian
+            const now = new Date();
+            const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000));
+            
+            document.getElementById('custom-start-time').value = formatDateTimeLocal(oneHourAgo);
+            document.getElementById('custom-end-time').value = formatDateTimeLocal(now);
+            
             // Tải dữ liệu ban đầu
             await refreshData();
             
@@ -970,12 +1186,38 @@
             // Thêm sự kiện cho các input
             document.getElementById('search-input').addEventListener('input', filterAlerts);
             document.getElementById('severity-filter').addEventListener('change', filterAlerts);
-            document.getElementById('time-filter').addEventListener('change', filterAlerts);
+            
+            // Xử lý thay đổi dropdown thời gian
+            document.getElementById('time-filter').addEventListener('change', function() {
+                if (this.value === 'custom') {
+                    // Hiển thị khung tuỳ chỉnh thời gian
+                    document.getElementById('custom-time-range').style.display = 'block';
+                    customTimeRange.active = false; // Chưa áp dụng
+                } else {
+                    // Ẩn khung tuỳ chỉnh và reset nếu có
+                    document.getElementById('custom-time-range').style.display = 'none';
+                    customTimeRange.active = false;
+                    filterAlerts();
+                }
+            });
             
             // Thêm sự kiện cho nút refresh
             document.getElementById('refresh-btn').addEventListener('click', async () => {
                 await refreshData();
                 startAutoRefresh();
+            });
+            
+            // Thêm sự kiện cho các nút tuỳ chỉnh thời gian
+            document.getElementById('apply-custom-time').addEventListener('click', applyCustomTimeRange);
+            document.getElementById('reset-custom-time').addEventListener('click', resetCustomTimeRange);
+            
+            // Cho phép nhấn Enter trong input thời gian để áp dụng
+            document.getElementById('custom-start-time').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') applyCustomTimeRange();
+            });
+            
+            document.getElementById('custom-end-time').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') applyCustomTimeRange();
             });
             
             // Tự động cập nhật thời gian mỗi phút
