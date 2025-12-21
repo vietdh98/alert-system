@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Cảnh báo Prometheus</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --success-color: #27ae60;
+            --info-color: #3498db;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+            --border-color: #bdc3c7;
+            --table-header-bg: #34495e;
+            --table-row-even: #f8f9fa;
+            --table-row-hover: #ecf0f1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #1a2530 100%);
+            color: white;
+            padding: 25px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo {
+            background: var(--secondary-color);
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .title h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .title p {
+            opacity: 0.8;
+            font-size: 14px;
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            padding: 20px 30px;
+            background: var(--light-color);
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+
+        .stat-info h3 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-info p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .controls {
+            padding: 25px 30px;
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 20px 12px 45px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #7f8c8d;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        select {
+            padding: 12px 20px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: white;
+            font-size: 14px;
+            min-width: 150px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .alert-table-container {
+            padding: 0 30px 30px;
+            overflow-x: auto;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--light-color);
+        }
+
+        .table-header h2 {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--dark-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-count {
+            background: var(--secondary-color);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .last-update {
+            font-size: 14px;
+            color: #7f8c8d;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        thead {
+            background: var(--table-header-bg);
+            color: white;
+        }
+
+        th {
+            padding: 18px 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 3px solid var(--secondary-color);
+        }
+
+        th i {
+            margin-right: 8px;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: var(--table-row-even);
+        }
+
+        tbody tr:hover {
+            background-color: var(--table-row-hover);
+        }
+
+        td {
+            padding: 16px 15px;
+            vertical-align: middle;
+        }
+
+        .severity {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            min-width: 100px;
+            justify-content: center;
+        }
+
+        .severity.critical {
+            background: rgba(231, 76, 60, 0.15);
+            color: var(--danger-color);
+            border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+
+        .severity.warning {
+            background: rgba(243, 156, 18, 0.15);
+            color: var(--warning-color);
+            border: 1px solid rgba(243, 156, 18, 0.3);
+        }
+
+        .severity.info {
+            background: rgba(52, 152, 219, 0.15);
+            color: var(--info-color);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+        }
+
+        .severity.normal {
+            background: rgba(46, 204, 113, 0.15);
+            color: var(--success-color);
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        .alert-name {
+            font-weight: 600;
+            color: var(--dark-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-name i {
+            color: var(--secondary-color);
+        }
+
+        .alert-content {
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .alert-content:hover {
+            white-space: normal;
+            overflow: visible;
+            position: relative;
+            z-index: 10;
+            background: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: -10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .ip-address {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            color: #495057;
+        }
+
+        .time-cell {
+            font-size: 14px;
+            color: #555;
+        }
+
+        .time-ago {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 4px;
+        }
+
+        .action-cell {
+            text-align: center;
+        }
+
+        .resolve-btn {
+            padding: 8px 16px;
+            background: var(--success-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .resolve-btn:hover {
+            background: #219653;
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(39, 174, 96, 0.3);
+        }
+
+        .resolve-btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .silence-btn {
+            padding: 8px 16px;
+            background: var(--warning-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-left: 5px;
+        }
+
+        .silence-btn:hover {
+            background: #d68910;
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(243, 156, 18, 0.3);
+        }
+
+        .no-alerts {
+            text-align: center;
+            padding: 60px 20px;
+            color: #7f8c8d;
+        }
+
+        .no-alerts i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .loading i {
+            font-size: 48px;
+            color: var(--secondary-color);
+            margin-bottom: 20px;
+            animation: spin 1.5s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .stats-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                max-width: 100%;
+            }
+            
+            th, td {
+                padding: 12px 8px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo-container">
+                <div class="logo">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="title">
+                    <h1>HỆ THỐNG CẢNH BÁO PROMETHEUS</h1>
+                    <p>Hiển thị cảnh báo đang active - Tự động ẩn khi resolved</p>
+                </div>
+            </div>
+            <div class="last-update">
+                <i class="fas fa-clock"></i>
+                Cập nhật lúc: <span id="update-time">--:--:--</span>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: var(--secondary-color);">
+                    <i class="fas fa-bell"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="total-alerts">0</h3>
+                    <p>Active Alerts</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: var(--danger-color);">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="critical-alerts">0</h3>
+                    <p>Critical</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: var(--warning-color);">
+                    <i class="fas fa-exclamation-circle"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="warning-alerts">0</h3>
+                    <p>Warning</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: var(--info-color);">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="normal-alerts">0</h3>
+                    <p>Normal</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="search-input" placeholder="Tìm kiếm cảnh báo...">
+            </div>
+            <div class="filter-group">
+                <select id="severity-filter">
+                    <option value="all">Tất cả mức độ</option>
+                    <option value="critical">Critical</option>
+                    <option value="warning">Warning</option>
+                    <option value="info">Info</option>
+                    <option value="normal">Normal</option>
+                </select>
+                <select id="time-filter">
+                    <option value="all">Tất cả thời gian</option>
+                    <option value="1h">1 giờ qua</option>
+                    <option value="24h">24 giờ qua</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="refresh-btn">
+                <i class="fas fa-sync-alt"></i> Làm mới
+            </button>
+        </div>
+
+        <!-- Alert Table -->
+        <div class="alert-table-container">
+            <div class="table-header">
+                <h2><i class="fas fa-list"></i> Cảnh báo đang active <span class="alert-count" id="table-count">0</span></h2>
+                <div class="last-update">
+                    <i class="fas fa-history"></i>
+                    Tự động cập nhật: <span id="countdown">5</span>s
+                </div>
+            </div>
+            
+            <div id="table-loading" class="loading">
+                <i class="fas fa-spinner"></i>
+                <p>Đang tải dữ liệu cảnh báo...</p>
+            </div>
+            
+            <table id="alerts-table">
+                <thead>
+                    <tr>
+                        <th><i class="fas fa-hashtag"></i> STT</th>
+                        <th><i class="fas fa-exclamation-triangle"></i> Mức độ</th>
+                        <th><i class="fas fa-tag"></i> Tên cảnh báo</th>
+                        <th><i class="fas fa-align-left"></i> Nội dung</th>
+                        <th><i class="fas fa-network-wired"></i> IP thiết bị</th>
+                        <th><i class="fas fa-clock"></i> Thời gian bắt đầu</th>
+                        <th><i class="fas fa-cogs"></i> Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="alerts-table-body">
+                    <!-- Dữ liệu sẽ được thêm bằng JavaScript -->
+                </tbody>
+            </table>
+            
+            <div id="no-alerts" class="no-alerts" style="display: none;">
+                <i class="fas fa-check-circle"></i>
+                <h3>Không có cảnh báo active</h3>
+                <p>Tất cả các cảnh báo đã được giải quyết hoặc không có cảnh báo nào mới</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Biến toàn cục
+        let activeAlerts = [];
+        let filteredAlerts = [];
+        let currentPage = 1;
+        const itemsPerPage = 10;
+        let autoRefreshInterval;
+        let countdown = 5;
+
+        // Hàm định dạng thời gian
+        function formatTime(timeString) {
+            const date = new Date(timeString);
+            return date.toLocaleString('vi-VN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        // Tính thời gian đã trôi qua
+        function timeAgo(timeString) {
+            const date = new Date(timeString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'Vừa xong';
+            if (diffMins < 60) return `${diffMins} phút trước`;
+            if (diffHours < 24) return `${diffHours} giờ trước`;
+            return `${diffDays} ngày trước`;
+        }
+
+        // Cập nhật thời gian
+        function updateTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('vi-VN');
+            document.getElementById('update-time').textContent = timeStr;
+        }
+
+        // Cập nhật thống kê
+        function updateStats() {
+            const total = filteredAlerts.length;
+            const critical = filteredAlerts.filter(a => a.severity === 'critical').length;
+            const warning = filteredAlerts.filter(a => a.severity === 'warning').length;
+            const normal = filteredAlerts.filter(a => a.severity === 'normal' || a.severity === 'info').length;
+            
+            document.getElementById('total-alerts').textContent = total;
+            document.getElementById('critical-alerts').textContent = critical;
+            document.getElementById('warning-alerts').textContent = warning;
+            document.getElementById('normal-alerts').textContent = normal;
+            document.getElementById('table-count').textContent = total;
+            
+            // Hiển thị/ẩn thông báo không có cảnh báo
+            if (total === 0) {
+                document.getElementById('no-alerts').style.display = 'block';
+                document.getElementById('alerts-table').style.display = 'none';
+            } else {
+                document.getElementById('no-alerts').style.display = 'none';
+                document.getElementById('alerts-table').style.display = 'table';
+            }
+        }
+
+        // Lấy icon cho mức độ cảnh báo
+        function getSeverityIcon(severity) {
+            switch(severity) {
+                case 'critical': return 'fas fa-fire';
+                case 'warning': return 'fas fa-exclamation-triangle';
+                case 'info': return 'fas fa-info-circle';
+                case 'normal': return 'fas fa-check-circle';
+                default: return 'fas fa-bell';
+            }
+        }
+
+        // Fetch dữ liệu từ Alertmanager API
+        async function fetchAlerts() {
+            try {
+                // URL của Alertmanager API - thay đổi theo cấu hình của bạn
+                const response = await fetch('http://localhost:9093/api/v2/alerts');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const alerts = await response.json();
+                
+                // Lọc chỉ lấy cảnh báo đang active (firing)
+                return alerts.filter(alert => {
+                    const status = alert.status?.state || 'unknown';
+                    return status === 'firing'; // Chỉ lấy cảnh báo đang firing
+                }).map(alert => {
+                    // Parse dữ liệu từ Alertmanager format
+                    return {
+                        id: alert.fingerprint,
+                        severity: alert.labels?.severity || 'warning',
+                        name: alert.labels?.alertname || 'Unknown',
+                        content: alert.annotations?.description || alert.annotations?.summary || '',
+                        ip: alert.labels?.instance || alert.labels?.ip || 'Unknown',
+                        startTime: alert.startsAt,
+                        status: alert.status?.state || 'firing',
+                        labels: alert.labels,
+                        annotations: alert.annotations
+                    };
+                });
+            } catch (error) {
+                console.error('Error fetching alerts:', error);
+                return []; // Trả về mảng rỗng nếu có lỗi
+            }
+        }
+
+        // Resolve cảnh báo (gửi request đến Alertmanager)
+        async function resolveAlert(alertId) {
+            try {
+                // API endpoint để resolve cảnh báo
+                const response = await fetch(`http://localhost:9093/api/v2/alerts`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify([{
+                        fingerprint: alertId,
+                        status: {
+                            state: 'resolved'
+                        }
+                    }])
+                });
+                
+                if (response.ok) {
+                    // Xóa cảnh báo khỏi danh sách active
+                    activeAlerts = activeAlerts.filter(alert => alert.id !== alertId);
+                    filterAlerts();
+                    alert('Đã giải quyết cảnh báo thành công!');
+                } else {
+                    throw new Error('Failed to resolve alert');
+                }
+            } catch (error) {
+                console.error('Error resolving alert:', error);
+                alert('Có lỗi xảy ra khi giải quyết cảnh báo!');
+            }
+        }
+
+        // Silence cảnh báo
+        async function silenceAlert(alertId, duration = '1h') {
+            try {
+                const response = await fetch('http://localhost:9093/api/v2/silences', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        matchers: [{
+                            name: 'fingerprint',
+                            value: alertId,
+                            isRegex: false
+                        }],
+                        startsAt: new Date().toISOString(),
+                        endsAt: new Date(Date.now() + 3600000).toISOString(), // 1 hour
+                        createdBy: 'Web Interface',
+                        comment: 'Silenced via web interface'
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('Đã tạo silence cho cảnh báo!');
+                }
+            } catch (error) {
+                console.error('Error creating silence:', error);
+                alert('Có lỗi xảy ra khi tạo silence!');
+            }
+        }
+
+        // Hiển thị bảng cảnh báo
+        function renderAlerts() {
+            const tableBody = document.getElementById('alerts-table-body');
+            const loading = document.getElementById('table-loading');
+            
+            // Ẩn loading
+            if (loading) loading.style.display = 'none';
+            
+            if (filteredAlerts.length === 0) {
+                updateStats();
+                return;
+            }
+            
+            let html = '';
+            
+            filteredAlerts.forEach((alert, index) => {
+                const severityIcon = getSeverityIcon(alert.severity);
+                const severityClass = alert.severity;
+                const severityText = alert.severity === 'critical' ? 'Critical' : 
+                                    alert.severity === 'warning' ? 'Warning' : 
+                                    alert.severity === 'info' ? 'Info' : 'Normal';
+                
+                // Lấy nội dung cảnh báo từ annotations
+                const content = alert.content || alert.annotations?.description || 
+                              alert.annotations?.summary || 'No description';
+                
+                html += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>
+                            <span class="severity ${severityClass}">
+                                <i class="${severityIcon}"></i> ${severityText}
+                            </span>
+                        </td>
+                        <td class="alert-name">
+                            <i class="fas fa-bell"></i> ${alert.name}
+                        </td>
+                        <td class="alert-content" title="${content}">
+                            ${content}
+                        </td>
+                        <td>
+                            <span class="ip-address">
+                                <i class="fas fa-desktop"></i> ${alert.ip}
+                            </span>
+                        </td>
+                        <td class="time-cell">
+                            ${formatTime(alert.startTime)}
+                            <div class="time-ago">
+                                <i class="far fa-clock"></i> ${timeAgo(alert.startTime)}
+                            </div>
+                        </td>
+                        <td class="action-cell">
+                            <button class="resolve-btn" onclick="handleResolveAlert('${alert.id}')" title="Đánh dấu cảnh báo đã được giải quyết">
+                                <i class="fas fa-check"></i> Giải quyết
+                            </button>
+                            <button class="silence-btn" onclick="handleSilenceAlert('${alert.id}')" title="Tạm thời tắt cảnh báo">
+                                <i class="fas fa-volume-mute"></i> Silence
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tableBody.innerHTML = html;
+            updateStats();
+        }
+
+        // Xử lý resolve alert
+        async function handleResolveAlert(alertId) {
+            if (confirm('Bạn có chắc chắn muốn đánh dấu cảnh báo này đã được giải quyết?')) {
+                await resolveAlert(alertId);
+            }
+        }
+
+        // Xử lý silence alert
+        async function handleSilenceAlert(alertId) {
+            if (confirm('Bạn có muốn tạo silence cho cảnh báo này trong 1 giờ?')) {
+                await silenceAlert(alertId);
+            }
+        }
+
+        // Lọc cảnh báo
+        function filterAlerts() {
+            const searchText = document.getElementById('search-input').value.toLowerCase();
+            const severityFilter = document.getElementById('severity-filter').value;
+            const timeFilter = document.getElementById('time-filter').value;
+            
+            filteredAlerts = activeAlerts.filter(alert => {
+                // Lọc theo search text
+                if (searchText && !alert.name.toLowerCase().includes(searchText) && 
+                    !alert.content.toLowerCase().includes(searchText) && 
+                    !alert.ip.toLowerCase().includes(searchText)) {
+                    return false;
+                }
+                
+                // Lọc theo mức độ cảnh báo
+                if (severityFilter !== 'all' && alert.severity !== severityFilter) {
+                    return false;
+                }
+                
+                // Lọc theo thời gian
+                if (timeFilter !== 'all') {
+                    const alertTime = new Date(alert.startTime);
+                    const now = new Date();
+                    let timeLimit = new Date();
+                    
+                    switch(timeFilter) {
+                        case '1h':
+                            timeLimit.setHours(now.getHours() - 1);
+                            break;
+                        case '24h':
+                            timeLimit.setHours(now.getHours() - 24);
+                            break;
+                    }
+                    
+                    if (alertTime < timeLimit) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            });
+            
+            renderAlerts();
+        }
+
+        // Tự động làm mới dữ liệu
+        function startAutoRefresh() {
+            clearInterval(autoRefreshInterval);
+            countdown = 5;
+            
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                document.getElementById('countdown').textContent = countdown;
+                
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    refreshData();
+                    startAutoRefresh();
+                }
+            }, 1000);
+        }
+
+        // Làm mới dữ liệu
+        async function refreshData() {
+            try {
+                const alerts = await fetchAlerts();
+                activeAlerts = alerts; // Chỉ lưu cảnh báo active
+                filterAlerts();
+                updateTime();
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+            }
+        }
+
+        // Khởi tạo
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Cập nhật thời gian
+            updateTime();
+            
+            // Ẩn bảng ban đầu
+            document.getElementById('alerts-table').style.display = 'none';
+            
+            // Tải dữ liệu ban đầu
+            await refreshData();
+            
+            // Bắt đầu tự động refresh
+            startAutoRefresh();
+            
+            // Thêm sự kiện cho các input
+            document.getElementById('search-input').addEventListener('input', filterAlerts);
+            document.getElementById('severity-filter').addEventListener('change', filterAlerts);
+            document.getElementById('time-filter').addEventListener('change', filterAlerts);
+            
+            // Thêm sự kiện cho nút refresh
+            document.getElementById('refresh-btn').addEventListener('click', async () => {
+                await refreshData();
+                startAutoRefresh();
+            });
+            
+            // Tự động cập nhật thời gian mỗi phút
+            setInterval(updateTime, 60000);
+        });
+    </script>
+</body>
+</html>
