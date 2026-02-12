@@ -1,0 +1,56 @@
+version: "3.3"
+
+services:
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    restart: always
+    user: "0"
+    ports:
+      - "8888:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_FEATURE_TOGGLES_ENABLE=timeSeriesTable #enable_sparkline_feature
+    volumes:
+      - data:/var/lib/grafana
+    networks:
+      monitoring_net: 
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - --config.file=/etc/prometheus.yaml
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+      - --enable-feature=native-histograms
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus.yaml
+    ports:
+      - "9090:9090"
+    networks:
+      monitoring_net:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"      # Giới hạn dung lượng mỗi file log (100MB)
+        max-file: "5"  
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: unless-stopped
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    ports:
+      - 9093:9093
+    networks:
+      monitoring_net:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"      # Giới hạn dung lượng mỗi file log (100MB)
+        max-file: "5" 
+
+networks: 
+  monitoring_net:
+    external: true
+volumes: 
+  data: 
